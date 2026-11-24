@@ -95,6 +95,7 @@ const RuleParams = memo(function RuleParams({ rule }: Props) {
           label="语音文本"
           value={rule.ttsText || ''}
           onChange={(e) => u({ ttsText: e.target.value })}
+          placeholder="可用${变量名}引用AI输出"
           sx={{ flex: 1, minWidth: 100, '& input': { py: 0.5, fontSize: 12 }, '& label': { fontSize: 11 } }}
         />
       )}
@@ -122,6 +123,7 @@ const RuleParams = memo(function RuleParams({ rule }: Props) {
             label="输出变量"
             value={rule.aiOutputVar || ''}
             onChange={(e) => u({ aiOutputVar: e.target.value })}
+            placeholder="如comment"
             sx={{ width: 80, '& input': { py: 0.5, fontSize: 12 }, '& label': { fontSize: 11 } }}
           />
         </>

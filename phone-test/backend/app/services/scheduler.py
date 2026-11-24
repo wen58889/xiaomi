@@ -105,6 +105,10 @@ class Scheduler:
                 results = await engine.execute_yaml(yaml_content)
                 if results["stopped"]:
                     break
+                if results["failed"] > 0 and results["success"] == 0:
+                    logger.error("[%d] Loop %d: all %d steps failed, stopping",
+                                 device_id, loop_count, results["failed"])
+                    break
                 if results["failed"] > 0:
                     logger.warning("[%d] Loop %d had %d failed steps, continuing...",
                                    device_id, loop_count, results["failed"])

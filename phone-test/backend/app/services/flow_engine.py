@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 import re
+import time
 import yaml
 
 from app.services.moonraker_client import MoonrakerClient
@@ -77,11 +79,14 @@ class FlowEngine:
                 error_msg = f"Step {i+1} ({action}): {e}"
                 results["errors"].append(error_msg)
                 logger.error("[%d] %s", self.device_id, error_msg)
-                # Safety: raise Z on failure
-                try:
-                    await self.motion.client.send_gcode("G1 Z1.5 F3000")
-                except Exception:
-                    pass
+                await ws_manager.broadcast("step_error", {
+                    "device_id": self.device_id,
+                    "step": i + 1,
+                    "total": total,
+                    "action": action,
+                    "error": str(e),
+                })
+
 
         # Park Y after all steps so camera doesn't block the screen
         try:
@@ -97,7 +102,7 @@ class FlowEngine:
 
         if action == "tap_icon":
             template_name = step.get("template", step.get("icon", step.get("target", "")))
-            threshold = step.get("threshold", 0.85)
+            threshold = step.get("threshold", 0.75)
             await self._tap_icon(template_name, threshold)
         elif action == "tap":
             await self._tap_percent(step.get("screen_percent", [50, 50]))
@@ -192,7 +197,7 @@ class FlowEngine:
 
         model = step.get("model", "")
         context = step.get("context", "none")
-        max_tokens = step.get("max_tokens", 512)
+        max_tokens = step.get("max_tokens", 150)
         temperature = step.get("temperature", 1.0)
         output_var = step.get("output_var", "")
 
@@ -226,23 +231,27 @@ class FlowEngine:
             "output_var": output_var,
         })
 
-    async def _tap_icon(self, template_name: str, threshold: float = 0.85):
+    async def _tap_icon(self, template_name: str, threshold: float = 0.75):
         await self.motion.park_y()  # Move camera away before taking screenshot
+        await asyncio.sleep(0.3)  # Wait for camera to stabilize after arm movement
         screenshot = await capture_screenshot(self.device_ip)
         coords = await vision_manager.find_icon(
             screenshot, template_name, app_name=self._app_name, threshold=threshold,
         )
         if coords is None:
-            # Fallback: try OCR to find the text
-            text_coords = await vision_manager.read_text(screenshot)
-            for t in text_coords:
-                if template_name in t.text:
-                    coords = (t.x, t.y)
-                    logger.info("tap_icon OCR fallback: '%s' found via text at (%.0f, %.0f)",
-                                template_name, t.x, t.y)
-                    break
-        if coords is None:
-            raise RuntimeError(f"Template '{template_name}' not found (app={self._app_name})")
+            debug_dir = os.path.join(os.path.dirname(__file__), "..", "static", "debug")
+            os.makedirs(debug_dir, exist_ok=True)
+            debug_path = os.path.join(debug_dir, f"tap_fail_{template_name}_{int(time.time())}.jpg")
+            try:
+                with open(debug_path, "wb") as f:
+                    f.write(screenshot)
+                logger.warning("Saved debug screenshot: %s", debug_path)
+            except Exception:
+                pass
+            raise RuntimeError(
+                f"Template '{template_name}' match failed (app={self._app_name}, "
+                f"threshold={threshold}). Debug screenshot: {os.path.basename(debug_path)}"
+            )
         px, py = coords
         mx, my = self.coord.pixel_to_mech(px, py)
         await self.motion.tap(mx, my)

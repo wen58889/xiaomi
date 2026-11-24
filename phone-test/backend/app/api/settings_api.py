@@ -105,6 +105,20 @@ async def get_vision_settings(_=Depends(verify_token)):
     }
 
 
+@router.post("/vision/test")
+async def test_vision_api(_=Depends(verify_token)):
+    """测试当前配置的云端AI模型是否可用。"""
+    try:
+        from app.services.ai_service import ai_call
+        result = await ai_call(
+            prompt="请回复'模型测试成功'五个字",
+            max_tokens=50,
+        )
+        return {"status": "ok", "response": result}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
 class ScreenCropBody(BaseModel):
     x1: int
     y1: int

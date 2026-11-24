@@ -78,6 +78,10 @@ class TemplateMatchAdapter(VisionAdapter):
                 template_name, result.x, result.y, result.confidence,
             )
             return (result.x, result.y)
+        logger.warning(
+            "find_icon no match: %s (path=%s, threshold=%.2f)",
+            template_name, path, threshold,
+        )
         return None
 
     async def match_template_detail(

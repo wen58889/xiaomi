@@ -328,11 +328,23 @@ def create_engine() -> TTSEngine:
     return cls()
 
 
+def _cleanup_old_tts(max_keep: int = 20) -> None:
+    """保留最新max_keep个TTS文件，删除其余。"""
+    try:
+        files = sorted(WAV_DIR.glob("tts_*.*"), key=lambda f: f.stat().st_mtime, reverse=True)
+        for old_file in files[max_keep:]:
+            old_file.unlink()
+            logger.debug("TTS cleanup: deleted %s", old_file.name)
+    except Exception as e:
+        logger.warning("TTS cleanup failed: %s", e)
+
+
 async def synthesize_and_play(text: str, voice_type: int = 0) -> dict:
     engine = create_engine()
     settings = get_settings()
     vt = voice_type if voice_type > 0 else settings.tts_voice_type
     result = await engine.synthesize(text, vt)
     filename, duration_ms = result.save_wav()
+    _cleanup_old_tts(max_keep=20)
     logger.info("TTS [%s]: '%s' -> %s (%dms)", settings.tts_engine, text[:30], filename, duration_ms)
     return {"text": text, "audio_url": f"/static/tts/{filename}", "duration_ms": duration_ms, "engine": settings.tts_engine}

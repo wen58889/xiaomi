@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import logging
@@ -12,7 +13,7 @@ from app.services.moonraker_client import _get_shared_session
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT_SECONDS = 30
+TIMEOUT_SECONDS = 60
 
 
 def _encode_image(data: bytes) -> str:
@@ -65,13 +66,19 @@ class APIVisionAdapter(VisionAdapter):
         }
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         session = await _get_shared_session()
-        async with session.post(
-            self.base_url, json=payload, headers=headers,
-            timeout=aiohttp.ClientTimeout(total=TIMEOUT_SECONDS),
-        ) as resp:
-            data = await resp.json()
-            raw = data["choices"][0]["message"]["content"]
-            return self._strip_think(raw)
+        try:
+            async with session.post(
+                self.base_url, json=payload, headers=headers,
+                timeout=aiohttp.ClientTimeout(total=TIMEOUT_SECONDS),
+            ) as resp:
+                data = await resp.json()
+                if "choices" not in data:
+                    err_msg = data.get("error", {}).get("message", "") or data.get("message", "") or str(data)
+                    raise RuntimeError(f"API返回错误 (HTTP {resp.status}): {err_msg}")
+                raw = data["choices"][0]["message"]["content"]
+                return self._strip_think(raw)
+        except asyncio.TimeoutError:
+            raise RuntimeError(f"AI请求超时（{TIMEOUT_SECONDS}秒），模型可能繁忙或图片过大")
 
     async def _call_anthropic(self, prompt: str, images: list[bytes], max_tokens: int = 512) -> str:
         content = []

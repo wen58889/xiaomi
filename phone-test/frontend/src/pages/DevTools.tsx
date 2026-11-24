@@ -76,6 +76,16 @@ export default function DevTools() {
           action: data.action as string,
         })
         addLog(`步骤 ${data.step}/${data.total}: ${data.action}`, 'info')
+      } else if (event === 'step_error') {
+        addLog(`步骤${data.step}失败(${data.action}): ${data.error}`, 'error')
+      } else if (event === 'ai_result') {
+        addLog(`AI回复: ${data.result}`, 'success')
+      } else if (event === 'tts') {
+        if (data.error) {
+          addLog(`TTS失败: ${data.error}`, 'error')
+        } else {
+          addLog(`TTS播放: ${data.text}`, 'info')
+        }
       } else if (event === 'task_complete') {
         setTaskProgress(null)
         const status = data.status as string

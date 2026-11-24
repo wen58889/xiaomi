@@ -8,10 +8,10 @@ logger = logging.getLogger(__name__)
 X_MIN, X_MAX = 0.0, 150.0
 Y_MIN, Y_MAX = 0.0, 150.0
 Z_MIN, Z_MAX = -1.0, 10.0
-Z_SAFE = 3.0
+Z_SAFE = 2.0
 XY_MAX_FEED = 9000
 Z_MAX_FEED = 9000
-TAP_Z = -1.0
+TAP_Z = 0.0
 TAP_Z_FALLBACK = 0.05
 TAP_Z_FEED = 6000
 DEFAULT_XY_FEED = 6000
@@ -43,9 +43,10 @@ class MotionController:
         _validate_coord(x, y)
         feed = _clamp_feed(feed, XY_MAX_FEED)
         z_feed = _clamp_feed(DEFAULT_Z_FEED, Z_MAX_FEED)
-        await self.client.send_gcode("G90")
         try:
-            await self.client.send_gcode(f"G1 Z{Z_SAFE} F{z_feed}")
+            await self.client.send_gcode(
+                f"G90\nG1 Z{Z_SAFE} F{z_feed}\nG1 X{x:.2f} Y{y:.2f} F{feed}"
+            )
         except DeviceConnectionError as e:
             err = str(e).lower()
             if "out of range" in err or "home" in err:
@@ -53,13 +54,12 @@ class MotionController:
                 await self.client.send_gcode("G28")
                 try:
                     await self.client.send_gcode(
-                        f"G1 X{_COORD_EPSILON:.1f} Y{_COORD_EPSILON:.1f} Z{Z_SAFE} F{z_feed}"
+                        f"G90\nG1 X{_COORD_EPSILON:.1f} Y{_COORD_EPSILON:.1f} Z{Z_SAFE} F{z_feed}\nG1 X{x:.2f} Y{y:.2f} F{feed}"
                     )
                 except DeviceConnectionError:
                     pass
             else:
                 raise
-        await self.client.send_gcode(f"G1 X{x:.2f} Y{y:.2f} F{feed}")
 
     async def _tap_z(self, z: float):
         """Lower Z to tap height with fallback: if Z<0 is rejected by Klipper
@@ -68,8 +68,9 @@ class MotionController:
         z_clamped = max(Z_MIN + _COORD_EPSILON, min(Z_MAX - _COORD_EPSILON, z))
         raise_feed = _clamp_feed(DEFAULT_Z_FEED, Z_MAX_FEED)
         try:
-            await self.client.send_gcode(f"G1 Z{z_clamped:.2f} F{z_feed}")
-            await self.client.send_gcode(f"G1 Z{Z_SAFE} F{raise_feed}")
+            await self.client.send_gcode(
+                f"G1 Z{z_clamped:.2f} F{z_feed}\nG1 Z{Z_SAFE} F{raise_feed}"
+            )
             logger.info("[%s] Tap Z=%.2f (success)", self.client.ip, z_clamped)
         except DeviceConnectionError as e:
             err = str(e).lower()
@@ -80,8 +81,9 @@ class MotionController:
                     "TIP: Set [stepper_z] position_min: -1 in printer.cfg for better tap force.",
                     self.client.ip, z_clamped, TAP_Z_FALLBACK,
                 )
-                await self.client.send_gcode(f"G1 Z{TAP_Z_FALLBACK:.2f} F{z_feed}")
-                await self.client.send_gcode(f"G1 Z{Z_SAFE} F{raise_feed}")
+                await self.client.send_gcode(
+                    f"G1 Z{TAP_Z_FALLBACK:.2f} F{z_feed}\nG1 Z{Z_SAFE} F{raise_feed}"
+                )
                 logger.info("[%s] Tap Z=%.2f (fallback from %.2f)", self.client.ip, TAP_Z_FALLBACK, z_clamped)
             else:
                 raise
@@ -165,7 +167,7 @@ class MotionController:
         y_park = Y_MIN + _COORD_EPSILON
         feed = _clamp_feed(DEFAULT_XY_FEED, XY_MAX_FEED)
         z_feed = _clamp_feed(DEFAULT_Z_FEED, Z_MAX_FEED)
-        await self.client.send_gcode("G90")
-        await self.client.send_gcode(f"G1 Z{Z_SAFE} F{z_feed}")
-        await self.client.send_gcode(f"G1 Y{y_park:.2f} F{feed}")
+        await self.client.send_gcode(
+            f"G90\nG1 Z{Z_SAFE} F{z_feed}\nG1 Y{y_park:.2f} F{feed}"
+        )
         logger.info("[%s] Y parked at %.2f (camera clear of screen)", self.client.ip, y_park)

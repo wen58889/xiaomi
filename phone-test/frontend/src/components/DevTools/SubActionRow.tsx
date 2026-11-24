@@ -7,7 +7,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { memo, useCallback } from 'react'
 
-const actionTypes: ActionType[] = ['点击', '滑屏', '识图', '识字', 'TTS']
+const actionTypes: ActionType[] = ['点击', '滑屏', '识图', '识字', 'TTS', 'AI']
 
 const badges = ['❶', '❷', '❸', '❹', '❺', '❻', '❼', '❽', '❾', '❿']
 
@@ -127,15 +127,45 @@ const SubActionRow = memo(function SubActionRow({ ruleId, sub, index }: Props) {
           label="语音文本"
           value={sub.note || ''}
           onChange={(e) => u({ note: e.target.value })}
+          placeholder="可用${变量名}引用AI输出"
           sx={{ flex: 1, minWidth: 80, '& input': { py: 0.5, fontSize: 11 }, '& label': { fontSize: 10 } }}
         />
+      )}
+
+      {sub.actionType === 'AI' && (
+        <>
+          <TextField
+            size="small"
+            label="Prompt"
+            value={sub.aiPrompt || ''}
+            onChange={(e) => u({ aiPrompt: e.target.value })}
+            sx={{ flex: 1, minWidth: 80, '& input': { py: 0.5, fontSize: 11 }, '& label': { fontSize: 10 } }}
+          />
+          <Select
+            size="small"
+            value={sub.aiContext || 'none'}
+            onChange={(e) => u({ aiContext: e.target.value })}
+            sx={{ height: 26, minWidth: 70, fontSize: 11 }}
+          >
+            <MenuItem value="none">无上下文</MenuItem>
+            <MenuItem value="screenshot">带截图</MenuItem>
+          </Select>
+          <TextField
+            size="small"
+            label="输出变量"
+            value={sub.aiOutputVar || ''}
+            onChange={(e) => u({ aiOutputVar: e.target.value })}
+            placeholder="如comment"
+            sx={{ width: 70, '& input': { py: 0.5, fontSize: 11 }, '& label': { fontSize: 10 } }}
+          />
+        </>
       )}
 
       {numField('概率', sub.probability, 'probability', 52)}
       {numField('等min', sub.waitMin, 'waitMin', 58)}
       {numField('max', sub.waitMax, 'waitMax', 48)}
 
-      {sub.actionType !== 'TTS' && (
+      {sub.actionType !== 'TTS' && sub.actionType !== 'AI' && (
         <TextField
           size="small"
           label="备注"

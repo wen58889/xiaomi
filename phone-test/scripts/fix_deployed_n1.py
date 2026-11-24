@@ -387,7 +387,7 @@ def fix_device(ip, steps=None, password=PASSWORD):
             log(f"{ip}: USB watchdog v5已更新")
 
         if 2 in steps:
-            log(f"{ip}: [2/17] 修复USB autosuspend=-1...")
+            log(f"{ip}: [2/13] 修复USB autosuspend=-1...")
             run_cmd(client, "echo -1 > /sys/module/usbcore/parameters/autosuspend 2>/dev/null || true")
             run_cmd(client, """for d in /sys/bus/usb/devices/*/power/control; do echo on > "$d" 2>/dev/null; done""")
             upload_text(client, "/usr/local/bin/usb-autosuspend-fix.sh", USB_AUTOSUSPEND_FIX)
@@ -398,7 +398,7 @@ def fix_device(ip, steps=None, password=PASSWORD):
             log(f"{ip}: autosuspend={out} (期望-1)")
 
         if 3 in steps:
-            log(f"{ip}: [3/17] 修复eth0省电...")
+            log(f"{ip}: [3/13] 修复eth0省电...")
             upload_text(client, "/usr/local/bin/eth0-power-fix.sh", ETH0_POWER_FIX)
             make_executable(client, "/usr/local/bin/eth0-power-fix.sh")
             upload_text(client, "/etc/NetworkManager/dispatcher.d/99-eth0-stable.sh", NM_DISPATCHER_ETH0)
@@ -408,32 +408,32 @@ if [ "$LINK" = "no" ]; then ethtool -s eth0 autoneg on 2>/dev/null || true; logg
             log(f"{ip}: eth0省电已修复")
 
         if 4 in steps:
-            log(f"{ip}: [4/17] 修复NM speed=0...")
+            log(f"{ip}: [4/13] 修复NM speed=0...")
             run_cmd(client, """CON=$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep eth0 | head -1 | cut -d: -f1)
 if [ -n "$CON" ]; then nmcli con mod "$CON" 802-3-ethernet.speed 0 2>/dev/null || true; fi""")
             log(f"{ip}: NM speed=0已设置")
 
         if 5 in steps:
-            log(f"{ip}: [5/17] 禁用wired-watchdog...")
+            log(f"{ip}: [5/13] 禁用wired-watchdog...")
             run_cmd(client, "systemctl disable wired-watchdog 2>/dev/null || true; systemctl stop wired-watchdog 2>/dev/null || true")
             log(f"{ip}: wired-watchdog已禁用")
 
         if 6 in steps:
-            log(f"{ip}: [6/17] 部署net-check.service...")
+            log(f"{ip}: [6/13] 部署net-check.service...")
             upload_text(client, "/usr/local/bin/net-check.sh", NET_CHECK)
             make_executable(client, "/usr/local/bin/net-check.sh")
             deploy_service(client, "net-check", NET_CHECK_SERVICE, enable=True, start=False)
             log(f"{ip}: net-check.service已部署")
 
         if 7 in steps:
-            log(f"{ip}: [7/17] WiFi三层禁用...")
+            log(f"{ip}: [7/13] WiFi三层禁用...")
             run_cmd(client, "rfkill block wlan 2>/dev/null || true")
             run_cmd(client, "nmcli radio wifi off 2>/dev/null || true")
             run_cmd(client, "echo 'blacklist brcmfmac' > /etc/modprobe.d/brcmfmac.conf")
             log(f"{ip}: WiFi三层禁用已执行")
 
         if 8 in steps:
-            log(f"{ip}: [8/17] WiFi服务清理...")
+            log(f"{ip}: [8/13] WiFi服务清理...")
             run_cmd(client, "systemctl disable wifi-watchdog 2>/dev/null || true; systemctl stop wifi-watchdog 2>/dev/null || true")
             run_cmd(client, "rm -f /etc/NetworkManager/dispatcher.d/99-wifi-stability.sh 2>/dev/null || true")
             run_cmd(client, "rm -f /etc/NetworkManager/conf.d/no-p2p.conf 2>/dev/null || true")
@@ -442,7 +442,7 @@ if [ -n "$CON" ]; then nmcli con mod "$CON" 802-3-ethernet.speed 0 2>/dev/null |
             log(f"{ip}: WiFi服务已清理")
 
         if 9 in steps:
-            log(f"{ip}: [9/17] 部署rfkill持久化service...")
+            log(f"{ip}: [9/13] 部署rfkill持久化service...")
             upload_text(client, "/usr/local/bin/rfkill-wifi-block.sh", RFKILL_BLOCK)
             make_executable(client, "/usr/local/bin/rfkill-wifi-block.sh")
             deploy_service(client, "n1-rfkill-persist", RFKILL_PERSIST_SERVICE, enable=True, start=False)
@@ -551,15 +551,10 @@ def main():
         print("  7.  WiFi三层禁用 (rfkill+nmcli+黑名单)")
         print("  8.  WiFi服务清理")
         print("  9.  rfkill持久化service")
-        print("  10. alert-push.sh 告警推送函数库")
-        print("  11. link-monitor.service 有线链路监控")
-        print("  12. n1-health-monitor.service 系统资源监控")
-        print("  13. n1-health-api.service 健康状态HTTP API (端口8090)")
-        print("  14. n1-diagnose.sh 一键诊断收集")
-        print("  15. 硬件看门狗配置 (WatchdogSec=60)")
-        print("  16. NTP + logrotate配置")
-        print("  17. 重启usb-watchdog (加载alert-push)")
-        print("  18. 修复Fluidd WebSocket周期性断连 (ping_interval 10s→30s)")
+        print("  10. 硬件看门狗配置 (WatchdogSec=60)")
+        print("  11. NTP + logrotate配置")
+        print("  12. 重启usb-watchdog (加载alert-push)")
+        print("  13. 修复Fluidd WebSocket周期性断连 (ping_interval 10s→30s)")
         sys.exit(1)
 
     print(f"目标设备: {len(ips)}台, 步骤: {steps}")

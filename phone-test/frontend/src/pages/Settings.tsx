@@ -5,7 +5,7 @@ import BiotechIcon from '@mui/icons-material/Biotech'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import CancelIcon from '@mui/icons-material/Cancel'
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLogStore } from '../stores/logStore'
 import { colors } from '../theme'
 import client from '../api/client'
@@ -35,6 +35,7 @@ export default function Settings() {
   const [modelscopeToken, setModelscopeToken] = useState('')
   const [showKeys, setShowKeys] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [snack, setSnack] = useState<{ open: boolean; msg: string; severity: 'success' | 'error' }>({ open: false, msg: '', severity: 'success' })
   // Status loaded from backend (whether keys are configured)
   const [apiStatus, setApiStatus] = useState<{ openai: boolean; anthropic: boolean; custom: boolean; modelscope: boolean; vllm_url: string; tts: boolean }>({
@@ -88,6 +89,25 @@ export default function Settings() {
     refreshApiStatus()
   }, [])
 
+  // Auto-save to localStorage on any setting change (skip initial render)
+  const initialized = useRef(false)
+  useEffect(() => {
+    if (!initialized.current) {
+      initialized.current = true
+      return
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      serverIp, visionPort, apiPort, moonrakerPort, go2rtcPort,
+      openaiKey, anthropicKey, vllmBaseUrl,
+      modelscopeToken,
+      customApiBaseUrl, customApiKey, customApiModel,
+      ttsSecretId, ttsSecretKey, ttsVoiceType, ttsEngine, ttsCustomUrl, ttsCustomKey,
+    }))
+  }, [serverIp, visionPort, apiPort, moonrakerPort, go2rtcPort,
+      openaiKey, anthropicKey, vllmBaseUrl, modelscopeToken,
+      customApiBaseUrl, customApiKey, customApiModel,
+      ttsSecretId, ttsSecretKey, ttsVoiceType, ttsEngine, ttsCustomUrl, ttsCustomKey])
+
   const handleSave = async () => {
     // Save UI/connection settings to localStorage
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -123,6 +143,39 @@ export default function Settings() {
       addLog('配置保存失败', 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+
+  const handleTest = async () => {
+    setTesting(true)
+    try {
+      // 先保存当前配置到后端，再测试
+      await client.post('/settings/vision', {
+        openai_api_key: openaiKey,
+        anthropic_api_key: anthropicKey,
+        vllm_base_url: vllmBaseUrl,
+        modelscope_token: modelscopeToken,
+        custom_api_base_url: customApiBaseUrl,
+        custom_api_key: customApiKey,
+        custom_api_model: customApiModel,
+        tts_secret_id: ttsSecretId,
+        tts_secret_key: ttsSecretKey,
+        tts_voice_type: ttsVoiceType,
+        tts_engine: ttsEngine,
+        tts_custom_url: ttsCustomUrl,
+        tts_custom_key: ttsCustomKey,
+      })
+      const r = await client.post('/settings/vision/test')
+      if (r.data.status === 'ok') {
+        setSnack({ open: true, msg: `模型测试成功: ${r.data.response}`, severity: 'success' })
+      } else {
+        setSnack({ open: true, msg: `模型测试失败: ${r.data.error}`, severity: 'error' })
+      }
+    } catch (e: any) {
+      setSnack({ open: true, msg: `测试请求失败: ${e?.message || e}`, severity: 'error' })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -385,6 +438,11 @@ export default function Settings() {
             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
             sx={{ bgcolor: colors.success }}>
             {saving ? '保存中…' : '保存配置'}
+          </Button>
+          <Button variant="outlined" onClick={handleTest} disabled={testing}
+            startIcon={testing ? <CircularProgress size={16} /> : <BiotechIcon />}
+            sx={{ color: '#69f0ae', borderColor: '#69f0ae' }}>
+            {testing ? '测试中…' : '测试模型'}
           </Button>
           <Button variant="outlined" onClick={handleReset} sx={{ color: '#aaa', borderColor: '#555' }}>
             重置默认

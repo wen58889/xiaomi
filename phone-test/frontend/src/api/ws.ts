@@ -6,6 +6,7 @@ class WSClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   connect() {
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) return
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const url = `${proto}//${location.host}/api/v1/ws/status`
     this.ws = new WebSocket(url)
