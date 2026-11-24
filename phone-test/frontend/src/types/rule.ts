@@ -1,4 +1,4 @@
-export type ActionType = '点击' | '滑屏' | 'TTS' | '识图' | '识字'
+export type ActionType = '点击' | '滑屏' | 'TTS' | '识图' | '识字' | 'AI'
 export type PositionMode = '中心' | '相对' | '坐标'
 
 export interface SubAction {
@@ -22,6 +22,11 @@ export interface SubAction {
   threshold: number
   // 识字专用
   keyword: string
+  // AI专用
+  aiPrompt: string
+  aiModel: string
+  aiContext: string
+  aiOutputVar: string
 }
 
 export interface Rule {
@@ -49,6 +54,11 @@ export interface Rule {
   threshold: number
   // 识字专用
   keyword: string
+  // AI专用
+  aiPrompt: string
+  aiModel: string
+  aiContext: string
+  aiOutputVar: string
   subActions: SubAction[]
 }
 

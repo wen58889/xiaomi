@@ -44,6 +44,10 @@ function makeRule(overrides: Partial<Rule> = {}): Rule {
     templateName: '',
     threshold: 0.85,
     keyword: '',
+    aiPrompt: '',
+    aiModel: '',
+    aiContext: 'none',
+    aiOutputVar: '',
     subActions: [],
     ...overrides,
   }
@@ -84,6 +88,12 @@ function subActionLines(sub: SubAction): string[] {
     } else if (sub.actionType === '识字') {
       lines.push(`  - action: tap_text`)
       lines.push(`    keyword: "${(sub.keyword || '').replace(/"/g, '\\"')}"`)
+    } else if (sub.actionType === 'AI') {
+      lines.push(`  - action: ai_call`)
+      lines.push(`    prompt: "${(sub.aiPrompt || sub.note || '').replace(/"/g, '\\"')}"`)
+      if (sub.aiModel) lines.push(`    model: "${sub.aiModel}"`)
+      if (sub.aiContext && sub.aiContext !== 'none') lines.push(`    context: ${sub.aiContext}`)
+      if (sub.aiOutputVar) lines.push(`    output_var: ${sub.aiOutputVar}`)
     }
   }
 
@@ -141,6 +151,12 @@ export function rulesToYaml(rules: Rule[]): string {
     } else if (rule.actionType === '识字') {
       lines.push(`  - action: tap_text`)
       lines.push(`    keyword: "${(rule.keyword || '').replace(/"/g, '\\"')}"`)
+    } else if (rule.actionType === 'AI') {
+      lines.push(`  - action: ai_call`)
+      lines.push(`    prompt: "${(rule.aiPrompt || '').replace(/"/g, '\\"')}"`)
+      if (rule.aiModel) lines.push(`    model: "${rule.aiModel}"`)
+      if (rule.aiContext && rule.aiContext !== 'none') lines.push(`    context: ${rule.aiContext}`)
+      if (rule.aiOutputVar) lines.push(`    output_var: ${rule.aiOutputVar}`)
     }
 
     if (rule.waitMax > 0) {
@@ -315,6 +331,22 @@ export function yamlToRules(yaml: string): Rule[] {
         name,
         actionType: 'TTS',
         ttsText: String(step.text || ''),
+        waitMin: wMin, waitMax: wMax,
+      }))
+      i++
+      continue
+    }
+
+    if (action === 'ai_call') {
+      const name = step.description ? String(step.description) : `AI ${String(step.output_var || '')}`
+      const [wMin, wMax] = parseWait(step.wait)
+      rules.push(makeRule({
+        name,
+        actionType: 'AI',
+        aiPrompt: String(step.prompt || ''),
+        aiModel: String(step.model || ''),
+        aiContext: String(step.context || 'none'),
+        aiOutputVar: String(step.output_var || ''),
         waitMin: wMin, waitMax: wMax,
       }))
       i++

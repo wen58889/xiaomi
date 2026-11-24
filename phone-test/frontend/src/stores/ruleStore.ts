@@ -26,6 +26,10 @@ function createRule(name?: string): Rule {
     templateName: '',
     threshold: 0.85,
     keyword: '',
+    aiPrompt: '',
+    aiModel: '',
+    aiContext: 'none',
+    aiOutputVar: '',
     subActions: [],
   }
 }
@@ -46,6 +50,10 @@ function createSubAction(): SubAction {
     templateName: '',
     threshold: 0.85,
     keyword: '',
+    aiPrompt: '',
+    aiModel: '',
+    aiContext: 'none',
+    aiOutputVar: '',
   }
 }
 

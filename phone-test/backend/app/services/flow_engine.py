@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 import yaml
 
 from app.services.moonraker_client import MoonrakerClient
@@ -8,6 +9,7 @@ from app.services.screenshot import capture_screenshot
 from app.services.coordinate import CoordinateMapper
 from app.services.tts_service import synthesize_and_play
 from app.services.n1_player import play_on_device
+from app.services.ai_service import ai_call
 from app.vision.manager import vision_manager
 from app.ws_manager import ws_manager
 
@@ -28,9 +30,16 @@ class FlowEngine:
         self.coord = coord_mapper
         self._stopped = False
         self._app_name = ""  # set from YAML template
+        self._variables: dict[str, str] = {}  # 变量系统：ai_call输出 → ${var}引用
 
     def stop(self):
         self._stopped = True
+
+    def _resolve(self, text: str) -> str:
+        """变量插值：${var_name} → self._variables[var_name]"""
+        if not text or "${" not in text:
+            return text
+        return re.sub(r'\$\{(\w+)\}', lambda m: self._variables.get(m.group(1), ""), str(text))
 
     async def execute_yaml(self, yaml_content: str) -> dict:
         template = yaml.safe_load(yaml_content)
@@ -122,7 +131,7 @@ class FlowEngine:
         elif action == "wait":
             await asyncio.sleep(step.get("seconds", 1))
         elif action == "tts":
-            text = step.get("text", "")
+            text = self._resolve(step.get("text", ""))
             voice_type = step.get("voice_type", 0)
             if not text:
                 raise RuntimeError("tts: 'text' field is required")
@@ -150,6 +159,21 @@ class FlowEngine:
                 await ws_manager.broadcast("tts", {
                     "device_id": self.device_id, "text": text, "error": str(e),
                 })
+        elif action == "ai_call":
+            await self._ai_call(step)
+        elif action == "screenshot":
+            output_var = step.get("output_var", "")
+            if output_var:
+                await self.motion.park_y()
+                shot = await capture_screenshot(self.device_ip)
+                self._variables[output_var] = "captured"
+                self._variables[f"{output_var}_bytes"] = shot
+                logger.info("[%d] Screenshot captured → %s", self.device_id, output_var)
+        elif action == "set_var":
+            name = step.get("name", "")
+            value = self._resolve(str(step.get("value", "")))
+            if name:
+                self._variables[name] = value
         else:
             logger.warning("Unknown action: %s", action)
 
@@ -159,6 +183,48 @@ class FlowEngine:
             await asyncio.sleep(random.uniform(wait[0], wait[1]))
         elif wait > 0:
             await asyncio.sleep(wait)
+
+    async def _ai_call(self, step: dict):
+        """ai_call 动作：调用云端AI大模型，支持截图上下文。"""
+        prompt = self._resolve(step.get("prompt", ""))
+        if not prompt:
+            raise RuntimeError("ai_call: 'prompt' field is required")
+
+        model = step.get("model", "")
+        context = step.get("context", "none")
+        max_tokens = step.get("max_tokens", 512)
+        temperature = step.get("temperature", 1.0)
+        output_var = step.get("output_var", "")
+
+        context_image: bytes | None = None
+        if context == "screenshot":
+            await self.motion.park_y()
+            context_image = await capture_screenshot(self.device_ip)
+        elif context == "screenshot_var":
+            var_name = step.get("screenshot_var", "")
+            context_image = self._variables.get(f"{var_name}_bytes")
+
+        logger.info("[%d] ai_call: model=%s context=%s prompt=%s...",
+                     self.device_id, model or "default", context, prompt[:60])
+
+        result = await ai_call(
+            prompt=prompt,
+            model=model,
+            context_image=context_image,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+        if output_var:
+            self._variables[output_var] = result
+            logger.info("[%d] ai_call result → %s: %s...", self.device_id, output_var, result[:80])
+
+        await ws_manager.broadcast("ai_result", {
+            "device_id": self.device_id,
+            "prompt": prompt[:200],
+            "result": result,
+            "output_var": output_var,
+        })
 
     async def _tap_icon(self, template_name: str, threshold: float = 0.85):
         await self.motion.park_y()  # Move camera away before taking screenshot

@@ -3,7 +3,7 @@ import { Rule, ActionType, PositionMode } from '../../types/rule'
 import { useRuleStore } from '../../stores/ruleStore'
 import { memo, useCallback } from 'react'
 
-const actionTypes: ActionType[] = ['点击', '滑屏', '识图', '识字', 'TTS']
+const actionTypes: ActionType[] = ['点击', '滑屏', '识图', '识字', 'TTS', 'AI']
 const positionModes: PositionMode[] = ['中心', '相对', '坐标']
 
 interface Props {
@@ -97,6 +97,34 @@ const RuleParams = memo(function RuleParams({ rule }: Props) {
           onChange={(e) => u({ ttsText: e.target.value })}
           sx={{ flex: 1, minWidth: 100, '& input': { py: 0.5, fontSize: 12 }, '& label': { fontSize: 11 } }}
         />
+      )}
+
+      {rule.actionType === 'AI' && (
+        <>
+          <TextField
+            size="small"
+            label="Prompt"
+            value={rule.aiPrompt || ''}
+            onChange={(e) => u({ aiPrompt: e.target.value })}
+            sx={{ flex: 1, minWidth: 120, '& input': { py: 0.5, fontSize: 12 }, '& label': { fontSize: 11 } }}
+          />
+          <Select
+            size="small"
+            value={rule.aiContext || 'none'}
+            onChange={(e) => u({ aiContext: e.target.value })}
+            sx={{ height: 30, minWidth: 80, fontSize: 12 }}
+          >
+            <MenuItem value="none">无上下文</MenuItem>
+            <MenuItem value="screenshot">带截图</MenuItem>
+          </Select>
+          <TextField
+            size="small"
+            label="输出变量"
+            value={rule.aiOutputVar || ''}
+            onChange={(e) => u({ aiOutputVar: e.target.value })}
+            sx={{ width: 80, '& input': { py: 0.5, fontSize: 12 }, '& label': { fontSize: 11 } }}
+          />
+        </>
       )}
 
       {numField('定时/秒', rule.timer, 'timer', 65)}
